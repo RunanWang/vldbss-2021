@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"hash/fnv"
 	"io/ioutil"
 	"log"
@@ -135,7 +134,7 @@ func (c *MRCluster) worker() {
 				rpath := mergeName(t.dataDir, t.jobName, t.taskNumber)
 				f, buf := CreateFileAndBuf(rpath)
 				for k, v := range tempMap {
-					WriteToBuf(buf, fmt.Sprintf("%v %v\n", k, t.reduceF(k, v)))
+					WriteToBuf(buf, t.reduceF(k, v))
 				}
 				SafeClose(f, buf)
 			}
@@ -185,6 +184,7 @@ func (c *MRCluster) run(jobName, dataDir string, mapF MapF, reduceF ReduceF, map
 
 	// reduce phase
 	// YOUR CODE HERE :D
+	signal := make([]string, 0)
 	tasks = make([]*task, 0, nReduce)
 	for i := 0; i < nReduce; i++ {
 		t := &task{
@@ -199,12 +199,12 @@ func (c *MRCluster) run(jobName, dataDir string, mapF MapF, reduceF ReduceF, map
 		t.wg.Add(1)
 		tasks = append(tasks, t)
 		go func() { c.taskCh <- t }()
+		rpath := mergeName(t.dataDir, t.jobName, i)
+		signal = append(signal, rpath)
 	}
 	for _, t := range tasks {
 		t.wg.Wait()
 	}
-	signal := make([]string, 0)
-	signal = append(signal, "finish")
 	notify <- signal
 }
 
