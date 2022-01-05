@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"hash/fnv"
 	"io/ioutil"
 	"log"
@@ -30,7 +31,7 @@ type jobPhase string
 
 const (
 	mapPhase    jobPhase = "mapPhase"
-	reducePhase          = "reducePhase"
+	reducePhase jobPhase = "reducePhase"
 )
 
 type task struct {
@@ -112,9 +113,34 @@ func (c *MRCluster) worker() {
 				// hint: don't encode results returned by ReduceF, and just output
 				// them into the destination file directly so that users can get
 				// results formatted as what they want.
-				panic("YOUR CODE HERE")
+				tempMap := make(map[string][]string)
+				for i := 0; i < t.nMap; i++ {
+					reducePath := reduceName(t.dataDir, t.jobName, i, t.taskNumber)
+					file, err := os.Open(reducePath)
+					if err != nil {
+						panic(err)
+					}
+					dec := json.NewDecoder(file)
+					for {
+						var kv KeyValue
+						if err := dec.Decode(&kv); err != nil {
+							break
+						}
+						if _, ok := tempMap[kv.Key]; !ok {
+							tempMap[kv.Key] = make([]string, 0, 100)
+						}
+						tempMap[kv.Key] = append(tempMap[kv.Key], kv.Value)
+					}
+				}
+				rpath := mergeName(t.dataDir, t.jobName, t.taskNumber)
+				f, buf := CreateFileAndBuf(rpath)
+				for k, v := range tempMap {
+					WriteToBuf(buf, fmt.Sprintf("%v %v\n", k, t.reduceF(k, v)))
+				}
+				SafeClose(f, buf)
 			}
 			t.wg.Done()
+
 		case <-c.exit:
 			return
 		}
@@ -159,7 +185,27 @@ func (c *MRCluster) run(jobName, dataDir string, mapF MapF, reduceF ReduceF, map
 
 	// reduce phase
 	// YOUR CODE HERE :D
-	panic("YOUR CODE HERE")
+	tasks = make([]*task, 0, nReduce)
+	for i := 0; i < nReduce; i++ {
+		t := &task{
+			dataDir:    dataDir,
+			jobName:    jobName,
+			phase:      reducePhase,
+			taskNumber: i,
+			nReduce:    nReduce,
+			nMap:       nMap,
+			reduceF:    reduceF,
+		}
+		t.wg.Add(1)
+		tasks = append(tasks, t)
+		go func() { c.taskCh <- t }()
+	}
+	for _, t := range tasks {
+		t.wg.Wait()
+	}
+	signal := make([]string, 0)
+	signal = append(signal, "finish")
+	notify <- signal
 }
 
 func ihash(s string) int {

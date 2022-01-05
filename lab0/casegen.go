@@ -174,6 +174,8 @@ func genPercentCases() []CaseGenF {
 
 // CaseSingleURLPerFile .
 func CaseSingleURLPerFile(dataFileDir string, totalDataSize, nMapFiles int) Case {
+	// 生成nMapFiles个文件，
+	// 每个文件中有(totalDataSize / nMapFiles) / avgLen 条相同的url
 	if FileOrDirExist(dataFileDir) {
 		files := make([]string, 0, nMapFiles)
 		for i := 0; i < nMapFiles; i++ {
@@ -211,6 +213,7 @@ func CaseSingleURLPerFile(dataFileDir string, totalDataSize, nMapFiles int) Case
 }
 
 func genResult(rpath string, urlCount map[string]int) {
+	// 把urlCount中最多的10条记录以url:count的格式存在rpath下
 	us, cs := TopN(urlCount, 10)
 	f, buf := CreateFileAndBuf(rpath)
 	for i := range us {
@@ -220,6 +223,8 @@ func genResult(rpath string, urlCount map[string]int) {
 }
 
 func randomNURL(n int) ([]string, int) {
+	// 给定n为URL后缀的最大值
+	// 生成给定前缀、后缀为0-n的URL-list，并返回这些url的平均长度
 	length := 0
 	urls := make([]string, 0, n)
 	for i := 0; i < n; i++ {
@@ -237,5 +242,6 @@ var urlPrefixes = []string{
 }
 
 func wrapLikeURL(suffix string) string {
+	// 按照前缀和后缀拼接生成URL
 	return path.Join(urlPrefixes[rand.Intn(len(urlPrefixes))], suffix)
 }
